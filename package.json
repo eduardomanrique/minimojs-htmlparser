@@ -1,0 +1,28 @@
+{
+  "name": "minimojs-htmlparser",
+  "version": "0.0.1",
+  "description": "Javascript html parser",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha \"test/**/*.spec.js\""
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/eduardomanrique/minimojs-htmlparser.git"
+  },
+  "keywords": [
+    "html",
+    "parser"
+  ],
+  "author": "Eduardo Manrique",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/eduardomanrique/minimojs-htmlparser/issues"
+  },
+  "homepage": "https://github.com/eduardomanrique/minimojs-htmlparser#readme",
+  "dependencies": {
+    "esprima": "^4.0.1",
+    "minimojs-options": "^1.0.2",
+    "underscore": "^1.9.1"
+  }
+}
