@@ -1,10 +1,10 @@
 const _ = require('underscore');
 const {_eqIgnoreCase} = require('../util');
+const Element = require('./element');
 
 class HTMLDoc extends Element {
     constructor() {
         super("DOCUMENT", null);
-        this.root = this;
         this._requiredResourcesList = [];
     }
     _prepareHTMLElement() {
@@ -53,14 +53,11 @@ class HTMLDoc extends Element {
     replaceAllTexts(replacer) {
         this.getAllTextNodes().forEach(e => e.text = replacer.replace(e.text));
     }
-    renameAllAttributesWithName(name, newName) {
-        this.getAllElements().forEach(e => e.renameAttribute(this._name, newName));
-    }
     get htmlElement() {
         return this._htmlElement;
     }
     createElement(name) {
-        return new Element(name, this._root);
+        return new Element(name);
     }
 }
 

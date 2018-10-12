@@ -1,23 +1,24 @@
 const _ = require('underscore');
-const {_str, _eqIgnoreCase, _validateJS } = require('../util');
+const ParserObserver = require('./parserObserver');
+const HTMLDoc = require('../model/htmldoc');
+const {
+  _str
+} = require('../util');
 
 class HTMLParser {
   constructor(observer) {
     this._textNodes = [];
     this._doc = new HTMLDoc();
-    this._currentParent = this._doc;
     this._currentText = [];
-    this._current = null;
     this._currentIndex = 0;
-    this._currentRequires = false;
     this._currentLine = [];
-    this._observer = observer;
+    this._observer = new ParserObserver(this._doc, observer);
   }
   parse(html) {
     this._charArray = (html + "\n");
     let doc = this._doc;
     while (this.hasMore()) {
-      if (this._currentParent.name && this._currentParent.name.toLowerCase() == 'script') {
+      if (this._observer.elementName == 'script') {
         this.closeCurrentText();
         this.readScriptElementContent();
       } else if (this.nextIs("<!--")) {
@@ -41,23 +42,16 @@ class HTMLParser {
         this._currentText.push(currentChar);
       }
     }
-    while (!this._currentParent._isClosed && this._currentParent != doc) {
-      this._currentParent.setNotClosed();
-      this._currentParent = this._currentParent.parent;
+    while (!this._observer.element._isClosed && this._observer.element != doc) {
+      this._observer.element.setNotClosed();
+      this._observer.up();
     }
     return doc;
   }
   closeCurrentText() {
     const textValue = _str(this._currentText);
     if (textValue.length > 0) {
-      let nodes = [];
-      if(this._observer.onTextNode){
-        (this._observer.onTextNode(textValue) || []).forEach(node => nodes.push(node));
-      }
-      if(nodes.length == 0){
-        nodes.push(new Text(this._currentParent, textValue));
-      }
-      nodes.forEach(n => this._currentParent.__addChild(n));
+      this._observer.onTextNode(textValue);
     }
     this._currentText = [];
   }
@@ -65,7 +59,6 @@ class HTMLParser {
     return this.readTill("\n").toLowerCase();
   }
   readScriptElementContent() {
-    let tagName = this._currentParent.name;
     const sb = [];
     let j = this._currentIndex;
     while (true) {
@@ -76,11 +69,9 @@ class HTMLParser {
         while (this._charArray.length > h && (c = this._charArray[h++]) != '>') {
           valName.push(c);
         }
-        if (_str(valName).trim() == tagName) {
+        if (_str(valName).trim().toLowerCase() === 'script') {
           this._currentIndex = j + 2;
-          const text = new Text(_str(sb));
-          this._textNodes.push(text);
-          this._currentParent.__addChild(text);
+          this._observer.onTextNode(_str(sb));
           this.close();
           return;
         }
@@ -90,30 +81,15 @@ class HTMLParser {
   }
   inTag() {
     const name = this.readTill(" ", ">", "/>", "\n", "\t").toLowerCase();
-
-    !!!!!!!!!!
-    parei aqui. Fazer observer onNewElement -> se retornar alguma coisa substitui, se nao usa new Element
-
-
-
-    let element = new Element(name, this._doc);
-    let isRequiresTag = _eqIgnoreCase(name, "requires");
-    if (isRequiresTag) {
-      this._doc._requiredResourcesList.push(element);
-      this._currentRequires = element;
-    } else {
-      this._currentParent.__addChild(element);
-      this._currentParent = element;
-      this._current = element;
-    }
+    this._observer.onNewElement(name);
     //read attributes
     let currentAttributeValue = [];
     const checkEmptyAttribute = () => {
-      if (_str(currentAttributeValue).trim().length > 0)
-        element.setAttribute(_str(currentAttributeValue).trim(), null);
+      if (_str(currentAttributeValue).trim().length > 0) {
+        this.observer.onSetAttribute(_str(currentAttributeValue).trim(), null);
+      }
       currentAttributeValue = [];
     };
-    let dynAttr = 0;
     while (true) {
       if (this.discard(' ')) {
         checkEmptyAttribute();
@@ -122,18 +98,12 @@ class HTMLParser {
         //element without body
         this.advance();
         checkEmptyAttribute();
-        if (isRequiresTag) {
-          this._currentRequires.close();
-          this._currentRequires = null;
-        } else {
-          this.closeElement();
-        }
+        this.closeElement();
         break;
       } else if (this.nextIs(">")) {
         //element with body
         this.advance();
         checkEmptyAttribute();
-        this._current = null;
         break;
       }
       let s = this.read();
@@ -156,31 +126,16 @@ class HTMLParser {
                 this._currentIndex--;
                 val = val.substring(0, val.length - 1);
               }
-              element.setAttribute(attName, val);
+              this.observer.onSetAttribute(attName, val);
               currentAttributeValue = [];
               break;
             }
           }
         } else {
-          element.setAttribute(attName, null);
+          this.observer.onSetAttribute(attName, null);
         }
       } else {
         currentAttributeValue.push(s);
-      }
-    }
-    this.prepareElementsWithSource(element);
-  }
-  prepareElementsWithSource(element) {
-    if (element.name.toUpperCase() == "SCRIPT") {
-      let src = element.getAttribute("src");
-      if (src && src.startsWith("/")) {
-        element.setAttribute("src", `${src}`);
-      }
-    }
-    if (element.name.toUpperCase() == "A") {
-      let href = element.getAttribute("href");
-      if (href && href.startsWith("/")) {
-        element.setAttribute("href", `${href}`)
       }
     }
   }
@@ -206,40 +161,12 @@ class HTMLParser {
       throw new Error(`Error closing tag ${(tagName != null ? tagName : "")}: ${e.message}`);
     }
   }
-  closeTag(tagNameOrFilter) {
-    const isString = _.isString(tagNameOrFilter);
-    if (isString && _eqIgnoreCase(tagNameOrFilter, "requires")) {
-      this._currentRequires.close();
-      this._currentRequires = null;
-    } else {
-      const filter = e => isString ? tagNameOrFilter != e.name : !tagNameOrFilter(e);
-      let toClose = this._current instanceof Element ? this._current : this._currentParent;
-      while (filter(toClose)) {
-        if (!toClose._isClosed) {
-          toClose.setNotClosed();
-        }
-        let prev = toClose;
-        while (true) {
-          prev = prev.getPrevious();
-          if (!prev) {
-            toClose = toClose.parent;
-            break;
-          } else if (prev instanceof Element && !prev._isClosed) {
-            toClose = prev;
-            break;
-          }
-        }
-      }
-      toClose.close();
-      this._currentParent = toClose.parent;
-      this._current = null;
-    }
+  closeTag(tagName) {
+    this._observer.closeTag(tagName);
     this._currentIndex++;
   }
   closeElement() {
-    this._currentParent = this._current.parent;
-    this._current.close();
-    this._current = null;
+    this._observer.closeCurrentElement();
   }
   readTill(...s) {
     let sb = [];
@@ -265,9 +192,7 @@ class HTMLParser {
       }
       sb.push(this.read());
     }
-    const comment = new Comment(_str(sb));
-    this._currentParent.__addChild(comment);
-    comment.close();
+    this._observer.onComment(_str(sb));
   }
   inCDATA() {
     const sb = [];
@@ -278,7 +203,7 @@ class HTMLParser {
       }
       sb.push(this.read());
     }
-    this._currentParent.__addChild(new Text(_str(sb)));
+    this._observer.onTextNode(_str(sb));
   }
   advance() {
     this._currentIndex += this.lastAdvance;

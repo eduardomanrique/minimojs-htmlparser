@@ -1,9 +1,12 @@
 const _ = require('underscore');
 const options = require('minimojs-options');
 const {_str, _clearObj, _getAllTextNodes, _isEmptyText, _eqIgnoreCase } = require('../util');
+const Node = require('./node');
+const Attribute = require('./attribute');
+const Text = require('./text');
 
 class Element extends Node {
-    constructor(name, root) {
+    constructor(name) {
         super();
         this._children = [];
         this._attributes = {};
@@ -13,10 +16,6 @@ class Element extends Node {
         this._isClosed = false;
         this._isComponent = false;
         this._componentName = null;
-        this._root = root;
-    }
-    set root(root) {
-        this._root = root;
     }
     get attributes() {
         return _.values(this._attributes).map(a => {
@@ -59,7 +58,7 @@ class Element extends Node {
             }));
     }
     addElement(name) {
-        let e = new Element(name, this._root);
+        let e = new Element(name);
         this.__addChild(e);
         return e;
     }

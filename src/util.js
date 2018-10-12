@@ -1,5 +1,7 @@
 const _ = require('underscore');
 const esprima = require('esprima');
+const Comment = require('./model/comment');
+const Text = require('./model/text');
 
 module.exports = {
     _str: (sb) => sb.join(''),

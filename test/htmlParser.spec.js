@@ -1,59 +1,13 @@
-require('./test');
 require('chai').should();
-const rewire = require('rewire');
 const expect = require('chai').expect;
-const _ = require('underscore');
 const assert = require('assert');
-const process = require('process');
-const htmlParser = require('../minimojs/htmlparser');
-const _htmlParser = rewire('../minimojs/htmlparser');
+const parseHTML = require('../src/parser/htmlParser').parseHTML;
 
 describe('Test html parser', function () {
-  it('Test private functions', () => {
-    //_htmlParser._isEmptyText
-    expect(_htmlParser.__get__('_eqIgnoreCase')('asdf', 'ASdf')).is.equal(true);
-    expect(_htmlParser.__get__('_eqIgnoreCase')('asdf', 'ssdf')).is.equal(false);
-    expect(_htmlParser.__get__('_validateJS')('var a = 1;')).is.equal(true);
-  });
 
-  it('Test dom', () => {
-    let doc = new htmlParser.HTMLDoc();
-    let htmlEl = doc.addElement('html');
-    let script = new htmlParser.Text('console.log("1");');
-    htmlEl.addElement('head').addElement('script').__addChild(script);
-    let body = htmlEl.addElement('body');
-    let comment = new htmlParser.Comment('Comment');
-    body.__addChild(comment);
-    let div = body.addElement('div');
-    div.setAttribute("id", "1234");
-    div.setAttribute("att", "val");
-    let divText = new htmlParser.Text('Div of id 1234');
-    div.__addChild(divText);
-    let bodyText = new htmlParser.Text('Text 1234 "aa"');
-    body.__addChild(bodyText);
+  it('Test simple parsing without observer', () => {
 
-    let jsonDoc = doc.toJson();
-
-    expect(jsonDoc.n).is.eq('DOCUMENT');
-    let jsonHtml = jsonDoc.c[0];
-    expect(jsonHtml.n).is.eq('html');
-    expect(jsonHtml.c).to.have.lengthOf(2);
-    let jsonHead = jsonHtml.c[0];
-    expect(jsonHead.n).is.eq('head');
-    expect(jsonHead.c[0].n).is.eq('script');
-    expect(jsonHead.c[0].c[0]).is.eq('console.log("1");');
-    let jsonBody = jsonHtml.c[1];
-    expect(jsonBody.n).is.eq('body');
-    expect(jsonBody.c[0].n).is.eq('div');
-    expect(jsonBody.c[0].c[0]).is.eq('Div of id 1234');
-    expect(jsonBody.c[1]).is.eq('Text 1234 "aa"');
-
-    //expect(doc.toHTML()).is.eq('<html><head><script>console.log("1");</script></head><body><!--Comment--><div id="1234" att="val">Div of id 1234</div>Text 1234 "aa"</body></html>');
-  });
-
-  it('Test simple parsing', () => {
-    let parser = new htmlParser.HTMLParser();
-    let doc = parser.parse(`
+    let doc = parseHTML(`
       <html>
         <head>
           <script>console.log("1");</script>
@@ -164,8 +118,7 @@ describe('Test html parser', function () {
     //console.log(JSON.stringify(doc.toJson()))
   });
   it('Test find elements', () => {
-    let parser = new htmlParser.HTMLParser();
-    let doc = parser.parse(`
+    let doc = parseHTML(`
       <html>
         <head>
           <script>console.log("1");</script>
@@ -185,5 +138,8 @@ describe('Test html parser', function () {
     expect(doc.findDeepestChild('div').getAttribute("id")).is.eq('c');
     expect(doc.findDeepestChild('span').getAttribute("id")).is.eq('b');
     expect(doc.findDeepestChildWithAttribute('att').getAttribute("id")).is.eq('b');
+  });
+  it('Test find elements', () => {
+    throw new Error('fazer test com observer')
   });
 });
